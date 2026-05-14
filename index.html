@@ -8,8 +8,6 @@
     :root {
       color-scheme: dark;
       --bg: #080d1b;
-      --panel: rgba(255,255,255,.07);
-      --panel-2: rgba(255,255,255,.1);
       --text: #f7f9ff;
       --muted: #aeb8d6;
       --border: rgba(255,255,255,.16);
@@ -36,7 +34,6 @@
     }
 
     main { width: min(1180px, 100%); margin: 0 auto; }
-
     .hero { display: grid; gap: 12px; margin: 18px 0 28px; }
 
     h1 {
@@ -48,7 +45,7 @@
 
     .subtitle {
       margin: 0;
-      max-width: 820px;
+      max-width: 840px;
       color: var(--muted);
       font-size: 1.05rem;
       line-height: 1.55;
@@ -121,22 +118,6 @@
 
     button:disabled { opacity: .45; cursor: not-allowed; }
 
-    textarea {
-      width: 100%;
-      min-height: 180px;
-      resize: vertical;
-      margin-top: 14px;
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      background: rgba(0,0,0,.34);
-      color: var(--text);
-      padding: 14px;
-      font: .84rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      outline: none;
-    }
-
-    textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(122,167,255,.15); }
-
     .preview {
       margin-top: 14px;
       border: 1px solid var(--border);
@@ -160,9 +141,7 @@
       border-radius: 14px;
     }
 
-    @media (max-width: 520px) {
-      .media-card { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 520px) { .media-card { grid-template-columns: 1fr; } }
 
     .thumb {
       width: 96px;
@@ -191,6 +170,9 @@
     .status.bad { color: var(--bad); }
     .note { margin-top: 18px; color: var(--muted); font-size: .92rem; line-height: 1.5; }
 
+    progress { width: 100%; height: 12px; margin-top: 12px; display: none; }
+    progress.show { display: block; }
+
     code {
       color: #d5e2ff;
       background: rgba(255,255,255,.08);
@@ -215,19 +197,21 @@
         <p>Choose images, videos, or audio files. Multiple files are packaged into one large Base64 <code>.gsus</code> file.</p>
 
         <label class="drop-zone" id="mediaDrop">
-          <input id="mediaInput" type="file" accept="image/*,video/*,audio/*" multiple />
+          <input id="mediaInput" type="file" accept="image/*,video/*,audio/*,.jpg,.jpeg,.png,.gif,.webp,.svg,.avif,.mp4,.mov,.webm,.m4v,.mp3,.m4a,.wav,.ogg" multiple />
           <span>
             <span class="drop-title">Drop media here or tap to upload</span><br />
             <span class="drop-subtitle">Images, videos, and audio. Everything stays in your browser.</span>
           </span>
         </label>
 
+        <progress id="encodeProgress" max="100" value="0"></progress>
+
         <div class="actions">
           <button id="downloadGsusBtn" disabled>Download file##.gsus</button>
           <button class="secondary" id="copyGsusBtn" disabled>Copy .gsus text</button>
         </div>
 
-        <textarea id="gsusOutput" spellcheck="false" placeholder="Your .gsus Base64 bundle will appear here..."></textarea>
+        <div class="preview" id="encodePreview"><div class="empty">Selected files will show here after processing.</div></div>
         <div id="encodeStatus" class="status"></div>
       </article>
 
@@ -248,29 +232,31 @@
           <button class="secondary" id="downloadDecodedBtn" disabled>Download decoded files</button>
         </div>
 
-        <div class="preview" id="previewBox"><div class="empty">Decoded media preview will show here.</div></div>
+        <div class="preview" id="decodePreview"><div class="empty">Decoded media preview will show here.</div></div>
         <div id="decodeStatus" class="status"></div>
       </article>
     </section>
 
     <p class="note">
-      The <code>.gsus</code> extension is custom. The file is still readable text, but it contains a JSON media bundle with Base64 data URIs inside. Large videos can become very large because Base64 adds roughly one-third more size.
+      The <code>.gsus</code> extension is custom. The file is still readable text, but it contains a JSON media bundle with Base64 data URIs inside. Large videos can become very large because Base64 adds roughly one-third more size and may hit browser memory limits.
     </p>
   </main>
 
   <script>
     const mediaInput = document.getElementById('mediaInput');
     const gsusInput = document.getElementById('gsusInput');
-    const gsusOutput = document.getElementById('gsusOutput');
     const downloadGsusBtn = document.getElementById('downloadGsusBtn');
     const copyGsusBtn = document.getElementById('copyGsusBtn');
     const openViewerBtn = document.getElementById('openViewerBtn');
     const downloadDecodedBtn = document.getElementById('downloadDecodedBtn');
-    const previewBox = document.getElementById('previewBox');
+    const encodePreview = document.getElementById('encodePreview');
+    const decodePreview = document.getElementById('decodePreview');
     const encodeStatus = document.getElementById('encodeStatus');
     const decodeStatus = document.getElementById('decodeStatus');
+    const encodeProgress = document.getElementById('encodeProgress');
 
     let currentBundle = null;
+    let currentBundleText = '';
     let decodedBundle = null;
 
     function setStatus(element, message, type = '') {
@@ -294,11 +280,35 @@
       return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
     }
 
-    function getKind(mimeType) {
-      if ((mimeType || '').startsWith('image/')) return 'image';
-      if ((mimeType || '').startsWith('video/')) return 'video';
-      if ((mimeType || '').startsWith('audio/')) return 'audio';
+    function extensionFromName(fileName) {
+      return (fileName.match(/\.([a-z0-9]{1,8})$/i) || [])[1]?.toLowerCase() || '';
+    }
+
+    function mimeFromExtension(fileName) {
+      const ext = extensionFromName(fileName);
+      const map = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', avif: 'image/avif', bmp: 'image/bmp',
+        mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', mkv: 'video/x-matroska',
+        mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg', aac: 'audio/aac'
+      };
+      return map[ext] || '';
+    }
+
+    function getKind(mimeType, fileName = '') {
+      const mime = mimeType || mimeFromExtension(fileName);
+      if (mime.startsWith('image/')) return 'image';
+      if (mime.startsWith('video/')) return 'video';
+      if (mime.startsWith('audio/')) return 'audio';
       return 'file';
+    }
+
+    function isSupportedFile(file) {
+      return getKind(file.type, file.name) !== 'file';
+    }
+
+    function detectMime(dataUri) {
+      const match = String(dataUri || '').match(/^data:([^;]+);base64,/);
+      return match ? match[1] : '';
     }
 
     function isSupportedDataUri(value) {
@@ -326,13 +336,30 @@
       URL.revokeObjectURL(url);
     }
 
+    function dataUriToBlob(dataUri) {
+      const [header, base64] = dataUri.split(',');
+      const mime = (header.match(/^data:([^;]+);base64$/) || [])[1] || 'application/octet-stream';
+      const binary = atob(base64);
+      const chunks = [];
+      for (let i = 0; i < binary.length; i += 1024 * 512) {
+        const slice = binary.slice(i, i + 1024 * 512);
+        const bytes = new Uint8Array(slice.length);
+        for (let j = 0; j < slice.length; j++) bytes[j] = slice.charCodeAt(j);
+        chunks.push(bytes);
+      }
+      return new Blob(chunks, { type: mime });
+    }
+
     function downloadDataUri(dataUri, fileName) {
+      const blob = dataUriToBlob(dataUri);
+      const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
-      anchor.href = dataUri;
+      anchor.href = url;
       anchor.download = fileName;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     function nextGsusFileName() {
@@ -345,19 +372,25 @@
 
     function normalizeBundle(input, sourceName = 'decoded.gsus') {
       if (input && Array.isArray(input.files)) {
+        const files = input.files.map((item, index) => {
+          const dataUri = String(item.dataUri || item.dataURI || item.uri || '').trim();
+          const mimeType = item.mimeType || item.type || detectMime(dataUri) || mimeFromExtension(item.originalName || item.fileName || item.name || '') || 'application/octet-stream';
+          return {
+            id: item.id || `item-${index + 1}`,
+            originalName: safeName(item.originalName || item.fileName || item.name || `media-${index + 1}`),
+            mimeType,
+            sizeBytes: Number(item.sizeBytes || 0),
+            kind: item.kind || getKind(mimeType),
+            dataUri
+          };
+        }).filter(item => isSupportedDataUri(item.dataUri));
+
         return {
           gsus: input.gsus || 'GSUS_MEDIA_BASE64_URI_BUNDLE',
           version: input.version || 2,
           type: input.type || 'media-bundle',
           createdAt: input.createdAt || new Date().toISOString(),
-          files: input.files.map((item, index) => ({
-            id: item.id || `item-${index + 1}`,
-            originalName: safeName(item.originalName || item.fileName || item.name || `media-${index + 1}`),
-            mimeType: item.mimeType || item.type || detectMime(item.dataUri) || 'application/octet-stream',
-            sizeBytes: Number(item.sizeBytes || 0),
-            kind: item.kind || getKind(item.mimeType || item.type || detectMime(item.dataUri)),
-            dataUri: String(item.dataUri || item.dataURI || item.uri || '').trim()
-          })).filter(item => isSupportedDataUri(item.dataUri))
+          files
         };
       }
 
@@ -383,11 +416,6 @@
       return null;
     }
 
-    function detectMime(dataUri) {
-      const match = String(dataUri || '').match(/^data:([^;]+);base64,/);
-      return match ? match[1] : '';
-    }
-
     function parseGsusText(text, sourceName = 'decoded.gsus') {
       const trimmed = text.trim();
       if (!trimmed) throw new Error('That file is empty.');
@@ -396,9 +424,7 @@
         const parsed = JSON.parse(trimmed);
         const bundle = normalizeBundle(parsed, sourceName);
         if (bundle && bundle.files.length) return bundle;
-      } catch (_) {
-        // Not JSON. Try raw data URI mode below.
-      }
+      } catch (_) {}
 
       const matches = trimmed.match(/data:(image|video|audio)\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+/=\r\n]+/g) || [];
       const files = matches.map((raw, index) => {
@@ -414,9 +440,7 @@
         };
       }).filter(item => isSupportedDataUri(item.dataUri));
 
-      if (!files.length) {
-        throw new Error('No supported media Base64 data URI found. It needs image, video, or audio data.');
-      }
+      if (!files.length) throw new Error('No supported media Base64 data URI found. It needs image, video, or audio data.');
 
       return {
         gsus: 'GSUS_MEDIA_BASE64_URI_BUNDLE',
@@ -428,17 +452,17 @@
     }
 
     function extensionFromMime(mimeType, originalName = '') {
-      const existing = originalName.match(/\.([a-z0-9]{1,8})$/i);
-      if (existing) return existing[1];
+      const existing = extensionFromName(originalName);
+      if (existing) return existing;
       const map = {
-        'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/avif': 'avif',
+        'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/avif': 'avif', 'image/bmp': 'bmp',
         'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'video/x-matroska': 'mkv',
-        'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/webm': 'webm', 'audio/ogg': 'ogg'
+        'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/aac': 'aac'
       };
       return map[mimeType] || (mimeType && mimeType.includes('/') ? mimeType.split('/')[1].replace('+xml', '') : 'bin');
     }
 
-    function renderMediaElement(item, compact = false) {
+    function mediaElement(item, compact = false) {
       let element;
       if (item.kind === 'image') {
         element = document.createElement('img');
@@ -460,8 +484,8 @@
       return element;
     }
 
-    function renderPreview(bundle) {
-      previewBox.innerHTML = '';
+    function renderPreview(bundle, target) {
+      target.innerHTML = '';
       const grid = document.createElement('div');
       grid.className = 'preview-grid';
 
@@ -471,11 +495,16 @@
 
         const thumb = document.createElement('div');
         thumb.className = 'thumb';
-        thumb.appendChild(renderMediaElement(item, true));
+        thumb.appendChild(mediaElement(item, true));
 
         const meta = document.createElement('div');
         meta.className = 'meta';
-        meta.innerHTML = `<strong>${escapeHtml(item.originalName)}</strong><span>${escapeHtml(item.mimeType)}${item.sizeBytes ? ' · ' + formatBytes(item.sizeBytes) : ''}</span>`;
+
+        const title = document.createElement('strong');
+        title.textContent = item.originalName;
+
+        const detail = document.createElement('span');
+        detail.textContent = `${item.mimeType}${item.sizeBytes ? ' · ' + formatBytes(item.sizeBytes) : ''}`;
 
         const mini = document.createElement('div');
         mini.className = 'mini-actions';
@@ -491,41 +520,48 @@
         downloadBtn.addEventListener('click', () => downloadDecodedItem(item, index));
 
         mini.append(openBtn, downloadBtn);
-        meta.appendChild(mini);
+        meta.append(title, detail, mini);
         card.append(thumb, meta);
         grid.appendChild(card);
       });
 
-      previewBox.appendChild(grid);
-    }
-
-    function escapeHtml(value) {
-      return String(value).replace(/[&<>"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+      target.appendChild(grid);
     }
 
     async function handleMediaFiles(fileList) {
       const files = Array.from(fileList || []);
       if (!files.length) return;
 
-      const supported = files.filter(file => /^(image|video|audio)\//.test(file.type));
+      const supported = files.filter(isSupportedFile);
       if (!supported.length) {
         setStatus(encodeStatus, 'Choose at least one image, video, or audio file.', 'bad');
         return;
       }
 
-      setStatus(encodeStatus, `Encoding ${supported.length} file${supported.length === 1 ? '' : 's'}...`);
+      currentBundle = null;
+      currentBundleText = '';
       downloadGsusBtn.disabled = true;
       copyGsusBtn.disabled = true;
+      encodeProgress.classList.add('show');
+      encodeProgress.value = 0;
+      setStatus(encodeStatus, `Encoding ${supported.length} file${supported.length === 1 ? '' : 's'}...`);
 
       try {
-        const encodedFiles = await Promise.all(supported.map(async (file, index) => ({
-          id: `item-${index + 1}`,
-          originalName: safeName(file.name, `media-${index + 1}`),
-          mimeType: file.type || 'application/octet-stream',
-          sizeBytes: file.size,
-          kind: getKind(file.type),
-          dataUri: await readAsDataURL(file)
-        })));
+        const encodedFiles = [];
+        for (let i = 0; i < supported.length; i++) {
+          const file = supported[i];
+          const mimeType = file.type || mimeFromExtension(file.name) || 'application/octet-stream';
+          setStatus(encodeStatus, `Encoding ${i + 1}/${supported.length}: ${file.name}`);
+          encodedFiles.push({
+            id: `item-${i + 1}`,
+            originalName: safeName(file.name, `media-${i + 1}`),
+            mimeType,
+            sizeBytes: file.size,
+            kind: getKind(mimeType, file.name),
+            dataUri: await readAsDataURL(file)
+          });
+          encodeProgress.value = Math.round(((i + 1) / supported.length) * 100);
+        }
 
         currentBundle = {
           gsus: 'GSUS_MEDIA_BASE64_URI_BUNDLE',
@@ -535,34 +571,35 @@
           totalFiles: encodedFiles.length,
           files: encodedFiles
         };
+        currentBundleText = JSON.stringify(currentBundle, null, 2);
 
-        gsusOutput.value = JSON.stringify(currentBundle, null, 2);
+        renderPreview(currentBundle, encodePreview);
         downloadGsusBtn.disabled = false;
         copyGsusBtn.disabled = false;
         const originalSize = supported.reduce((sum, file) => sum + file.size, 0);
-        setStatus(encodeStatus, `Ready. ${encodedFiles.length} file${encodedFiles.length === 1 ? '' : 's'} encoded into one .gsus bundle. Original size: ${formatBytes(originalSize)}.`, 'good');
+        const outputSize = new Blob([currentBundleText]).size;
+        setStatus(encodeStatus, `Ready. ${encodedFiles.length} file${encodedFiles.length === 1 ? '' : 's'} encoded into one .gsus bundle. Original: ${formatBytes(originalSize)}. GSUS: ${formatBytes(outputSize)}.`, 'good');
       } catch (error) {
         setStatus(encodeStatus, error.message || 'Could not encode those files.', 'bad');
+      } finally {
+        encodeProgress.classList.remove('show');
       }
     }
 
     mediaInput.addEventListener('change', () => handleMediaFiles(mediaInput.files));
 
     downloadGsusBtn.addEventListener('click', () => {
-      if (!currentBundle) return;
-      downloadText(JSON.stringify(currentBundle, null, 2), nextGsusFileName());
+      if (!currentBundleText) return;
+      downloadText(currentBundleText, nextGsusFileName());
     });
 
     copyGsusBtn.addEventListener('click', async () => {
-      const value = gsusOutput.value.trim();
-      if (!value) return;
+      if (!currentBundleText) return;
       try {
-        await navigator.clipboard.writeText(value);
+        await navigator.clipboard.writeText(currentBundleText);
         setStatus(encodeStatus, 'Copied .gsus bundle text to clipboard.', 'good');
       } catch (_) {
-        gsusOutput.select();
-        document.execCommand('copy');
-        setStatus(encodeStatus, 'Copied .gsus bundle text to clipboard.', 'good');
+        setStatus(encodeStatus, 'Copy failed, probably because the bundle is too large. Download the .gsus file instead.', 'bad');
       }
     });
 
@@ -575,7 +612,7 @@
         try {
           decodedBundle = parseGsusText(String(reader.result || ''), file.name);
           if (!decodedBundle.files.length) throw new Error('No readable media files were found inside that .gsus file.');
-          renderPreview(decodedBundle);
+          renderPreview(decodedBundle, decodePreview);
           openViewerBtn.disabled = false;
           downloadDecodedBtn.disabled = false;
           setStatus(decodeStatus, `Decoded ${decodedBundle.files.length} file${decodedBundle.files.length === 1 ? '' : 's'} successfully.`, 'good');
@@ -583,7 +620,7 @@
           decodedBundle = null;
           openViewerBtn.disabled = true;
           downloadDecodedBtn.disabled = true;
-          previewBox.innerHTML = '<div class="empty">Decoded media preview will show here.</div>';
+          decodePreview.innerHTML = '<div class="empty">Decoded media preview will show here.</div>';
           setStatus(decodeStatus, error.message || 'Could not decode that .gsus file.', 'bad');
         }
       };
@@ -596,7 +633,7 @@
     downloadDecodedBtn.addEventListener('click', () => {
       if (!decodedBundle) return;
       decodedBundle.files.forEach((item, index) => {
-        setTimeout(() => downloadDecodedItem(item, index), index * 250);
+        setTimeout(() => downloadDecodedItem(item, index), index * 350);
       });
     });
 
@@ -614,9 +651,19 @@
         return;
       }
 
-      const safePayload = JSON.stringify(bundle).replace(/</g, '\\u003c');
-      tab.document.open();
-      tab.document.write(`<!doctype html>
+      const isSingle = bundle.files.length === 1;
+      const bodyClass = isSingle ? 'single' : 'multi';
+      const itemsHtml = bundle.files.map(item => {
+        const safeTitle = safeName(item.originalName, 'media').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const src = item.dataUri;
+        let media = '<p>Unsupported media</p>';
+        if (item.kind === 'image') media = `<img src="${src}" alt="${safeTitle}">`;
+        if (item.kind === 'video') media = `<video src="${src}" controls playsinline></video>`;
+        if (item.kind === 'audio') media = `<audio src="${src}" controls></audio>`;
+        return isSingle ? media : `<section class="item">${media}<div class="name">${safeTitle}</div></section>`;
+      }).join('');
+
+      const html = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -625,39 +672,23 @@
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; background: #000; color: #fff; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { overflow-x: hidden; }
-    .single { width: 100vw; height: 100vh; display: grid; place-items: center; background: #000; }
-    .single img, .single video { max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
-    .single audio { width: min(760px, 92vw); }
-    .multi { min-height: 100vh; padding: 18px; display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-content: start; }
+    body.single { width: 100vw; height: 100vh; display: grid; place-items: center; overflow: hidden; }
+    body.single img, body.single video { max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
+    body.single audio { width: min(760px, 92vw); }
+    body.multi { min-height: 100vh; padding: 18px; display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-content: start; overflow-x: hidden; }
     .item { display: grid; gap: 10px; padding: 12px; border: 1px solid rgba(255,255,255,.18); border-radius: 16px; background: rgba(255,255,255,.07); }
     .item img, .item video { width: 100%; max-height: 72vh; object-fit: contain; background: #000; border-radius: 10px; }
     .item audio { width: 100%; }
     .name { color: rgba(255,255,255,.78); font-size: 14px; overflow-wrap: anywhere; }
   </style>
 </head>
-<body>
-  <script type="application/json" id="payload">${safePayload}</script>
-  <script>
-    const bundle = JSON.parse(document.getElementById('payload').textContent);
-    const files = Array.isArray(bundle.files) ? bundle.files : [];
-    const root = document.body;
-    const escapeHtml = value => String(value).replace(/[&<>\"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[char]));
-    function media(item) {
-      const kind = item.kind || (item.mimeType || '').split('/')[0];
-      if (kind === 'image') return '<img src="' + item.dataUri + '" alt="' + escapeHtml(item.originalName || 'Decoded image') + '">';
-      if (kind === 'video') return '<video src="' + item.dataUri + '" controls playsinline></video>';
-      if (kind === 'audio') return '<audio src="' + item.dataUri + '" controls></audio>';
-      return '<p>Unsupported media</p>';
-    }
-    if (files.length === 1) {
-      root.innerHTML += '<main class="single">' + media(files[0]) + '</main>';
-    } else {
-      root.innerHTML += '<main class="multi">' + files.map(item => '<section class="item">' + media(item) + '<div class="name">' + escapeHtml(item.originalName || 'media') + '</div></section>').join('') + '</main>';
-    }
-  </script>
+<body class="${bodyClass}">
+  ${itemsHtml}
 </body>
-</html>`);
+</html>`;
+
+      tab.document.open();
+      tab.document.write(html);
       tab.document.close();
       setStatus(decodeStatus, 'Opened GSUS viewer in a new tab.', 'good');
     }
@@ -678,10 +709,31 @@
       });
 
       dropZone.addEventListener('drop', event => {
-        const input = dropZone.querySelector('input[type="file"]');
-        if (!event.dataTransfer.files.length) return;
-        input.files = event.dataTransfer.files;
-        input.dispatchEvent(new Event('change'));
+        event.preventDefault();
+        const files = event.dataTransfer.files;
+        if (!files.length) return;
+        if (dropZone.id === 'mediaDrop') handleMediaFiles(files);
+        if (dropZone.id === 'gsusDrop') {
+          const input = document.getElementById('gsusInput');
+          try {
+            input.files = files;
+            input.dispatchEvent(new Event('change'));
+          } catch (_) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              try {
+                decodedBundle = parseGsusText(String(reader.result || ''), files[0].name);
+                renderPreview(decodedBundle, decodePreview);
+                openViewerBtn.disabled = false;
+                downloadDecodedBtn.disabled = false;
+                setStatus(decodeStatus, `Decoded ${decodedBundle.files.length} file${decodedBundle.files.length === 1 ? '' : 's'} successfully.`, 'good');
+              } catch (error) {
+                setStatus(decodeStatus, error.message || 'Could not decode that .gsus file.', 'bad');
+              }
+            };
+            reader.readAsText(files[0]);
+          }
+        }
       });
     }
   </script>
