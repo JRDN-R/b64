@@ -5,737 +5,97 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GSUS Media Base64 Converter</title>
   <style>
-    :root {
-      color-scheme: dark;
-      --bg: #080d1b;
-      --text: #f7f9ff;
-      --muted: #aeb8d6;
-      --border: rgba(255,255,255,.16);
-      --accent: #7aa7ff;
-      --accent-2: #a978ff;
-      --good: #70e6a6;
-      --bad: #ff7d7d;
-      --radius: 22px;
-      --shadow: 0 24px 70px rgba(0,0,0,.35);
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(122,167,255,.28), transparent 36rem),
-        radial-gradient(circle at bottom right, rgba(169,120,255,.22), transparent 34rem),
-        var(--bg);
-      color: var(--text);
-      padding: 26px;
-    }
-
-    main { width: min(1180px, 100%); margin: 0 auto; }
-    .hero { display: grid; gap: 12px; margin: 18px 0 28px; }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(2.15rem, 5vw, 4.4rem);
-      line-height: .94;
-      letter-spacing: -.06em;
-    }
-
-    .subtitle {
-      margin: 0;
-      max-width: 840px;
-      color: var(--muted);
-      font-size: 1.05rem;
-      line-height: 1.55;
-    }
-
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-
-    @media (max-width: 860px) {
-      body { padding: 16px; }
-      .grid { grid-template-columns: 1fr; }
-    }
-
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.035));
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(12px);
-    }
-
-    .card h2 { margin: 0 0 8px; font-size: 1.25rem; letter-spacing: -.025em; }
-    .card p { margin: 0 0 16px; color: var(--muted); line-height: 1.45; }
-
-    .drop-zone {
-      position: relative;
-      min-height: 172px;
-      display: grid;
-      place-items: center;
-      padding: 18px;
-      text-align: center;
-      border: 1.5px dashed rgba(255,255,255,.3);
-      border-radius: 18px;
-      background: rgba(0,0,0,.22);
-      cursor: pointer;
-      overflow: hidden;
-      transition: 180ms ease;
-    }
-
-    .drop-zone:hover,
-    .drop-zone.dragover {
-      border-color: var(--accent);
-      background: rgba(122,167,255,.09);
-      transform: translateY(-1px);
-    }
-
-    .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-    .drop-title { display: inline-block; margin-bottom: 6px; font-weight: 800; font-size: 1.05rem; }
-    .drop-subtitle { color: var(--muted); font-size: .92rem; }
-
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
-
-    button {
-      appearance: none;
-      border: 0;
-      border-radius: 999px;
-      min-height: 42px;
-      padding: 11px 15px;
-      font-weight: 800;
-      color: #081126;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      cursor: pointer;
-    }
-
-    button.secondary {
-      color: var(--text);
-      background: rgba(255,255,255,.1);
-      border: 1px solid var(--border);
-    }
-
-    button:disabled { opacity: .45; cursor: not-allowed; }
-
-    .preview {
-      margin-top: 14px;
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      background: rgba(0,0,0,.22);
-      min-height: 190px;
-      overflow: hidden;
-      padding: 12px;
-    }
-
-    .preview-grid { display: grid; gap: 12px; }
-
-    .media-card {
-      display: grid;
-      grid-template-columns: 96px minmax(0, 1fr);
-      gap: 12px;
-      align-items: center;
-      padding: 10px;
-      background: rgba(255,255,255,.06);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-    }
-
-    @media (max-width: 520px) { .media-card { grid-template-columns: 1fr; } }
-
-    .thumb {
-      width: 96px;
-      height: 72px;
-      display: grid;
-      place-items: center;
-      overflow: hidden;
-      border-radius: 10px;
-      background: rgba(0,0,0,.35);
-      color: var(--muted);
-      font-size: .8rem;
-    }
-
-    .thumb img,
-    .thumb video { width: 100%; height: 100%; object-fit: cover; }
-    .thumb audio { width: 90px; }
-    .meta { min-width: 0; }
-    .meta strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .meta span { display: block; color: var(--muted); font-size: .88rem; margin-top: 4px; }
-    .mini-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
-    .mini-actions button { min-height: 34px; padding: 7px 11px; font-size: .85rem; }
-
-    .empty { color: var(--muted); text-align: center; padding: 34px 16px; }
-    .status { margin-top: 12px; min-height: 1.3em; color: var(--muted); font-size: .92rem; line-height: 1.4; }
-    .status.good { color: var(--good); }
-    .status.bad { color: var(--bad); }
-    .note { margin-top: 18px; color: var(--muted); font-size: .92rem; line-height: 1.5; }
-
-    progress { width: 100%; height: 12px; margin-top: 12px; display: none; }
-    progress.show { display: block; }
-
-    code {
-      color: #d5e2ff;
-      background: rgba(255,255,255,.08);
-      border: 1px solid var(--border);
-      border-radius: 7px;
-      padding: 2px 6px;
-    }
+    :root{color-scheme:dark;--bg:#080d1b;--card:rgba(255,255,255,.07);--text:#f7f9ff;--muted:#aeb8d6;--border:rgba(255,255,255,.16);--accent:#7aa7ff;--accent2:#a978ff;--good:#70e6a6;--bad:#ff7d7d}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at top left,rgba(122,167,255,.28),transparent 35rem),radial-gradient(circle at bottom right,rgba(169,120,255,.22),transparent 35rem),var(--bg);color:var(--text);padding:22px}main{width:min(1100px,100%);margin:auto}.hero{margin:14px 0 24px}h1{font-size:clamp(2rem,5vw,4rem);line-height:.95;letter-spacing:-.055em;margin:0 0 12px}.sub{color:var(--muted);line-height:1.55;max-width:850px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}@media(max-width:820px){.grid{grid-template-columns:1fr}body{padding:14px}}.card{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.035));border:1px solid var(--border);border-radius:22px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.35)}h2{margin:0 0 8px;font-size:1.25rem}.card p{color:var(--muted);line-height:1.45}.drop{position:relative;min-height:165px;display:grid;place-items:center;text-align:center;border:1.5px dashed rgba(255,255,255,.3);border-radius:18px;background:rgba(0,0,0,.22);padding:18px;cursor:pointer}.drop:hover,.drop.drag{border-color:var(--accent);background:rgba(122,167,255,.09)}.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}.title{font-weight:800}.small{display:block;margin-top:6px;color:var(--muted);font-size:.92rem}.actions{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}button{border:0;border-radius:999px;min-height:42px;padding:11px 15px;font-weight:800;color:#081126;background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer}button.secondary{color:var(--text);background:rgba(255,255,255,.1);border:1px solid var(--border)}button:disabled{opacity:.45;cursor:not-allowed}.preview{margin-top:14px;border:1px solid var(--border);border-radius:18px;background:rgba(0,0,0,.22);min-height:185px;padding:12px;overflow:hidden}.empty{color:var(--muted);text-align:center;padding:34px 16px}.list{display:grid;gap:12px}.item{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.06)}@media(max-width:520px){.item{grid-template-columns:1fr}}.thumb{width:96px;height:72px;display:grid;place-items:center;overflow:hidden;border-radius:10px;background:rgba(0,0,0,.35);color:var(--muted);font-size:.8rem}.thumb img,.thumb video{width:100%;height:100%;object-fit:cover}.thumb audio{width:90px}.meta{min-width:0}.meta strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meta span{display:block;color:var(--muted);font-size:.88rem;margin-top:4px}.mini{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.mini button{min-height:34px;padding:7px 11px;font-size:.85rem}.status{margin-top:12px;min-height:1.3em;color:var(--muted);font-size:.92rem;line-height:1.4}.good{color:var(--good)}.bad{color:var(--bad)}progress{display:none;width:100%;height:12px;margin-top:12px}progress.show{display:block}code{background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:7px;padding:2px 6px;color:#d5e2ff}.note{margin-top:18px;color:var(--muted);font-size:.92rem;line-height:1.5}
   </style>
 </head>
 <body>
-  <main>
-    <section class="hero">
-      <h1>GSUS Media ⇄ Base64</h1>
-      <p class="subtitle">
-        Upload one or multiple media files and download them as a single custom <code>.gsus</code> Base64 bundle. Upload that <code>.gsus</code> file later to rebuild and view the media in a new tab.
-      </p>
-    </section>
-
-    <section class="grid" aria-label="GSUS media Base64 converter">
-      <article class="card">
-        <h2>1. Media to .gsus</h2>
-        <p>Choose images, videos, or audio files. Multiple files are packaged into one large Base64 <code>.gsus</code> file.</p>
-
-        <label class="drop-zone" id="mediaDrop">
-          <input id="mediaInput" type="file" accept="image/*,video/*,audio/*,.jpg,.jpeg,.png,.gif,.webp,.svg,.avif,.mp4,.mov,.webm,.m4v,.mp3,.m4a,.wav,.ogg" multiple />
-          <span>
-            <span class="drop-title">Drop media here or tap to upload</span><br />
-            <span class="drop-subtitle">Images, videos, and audio. Everything stays in your browser.</span>
-          </span>
-        </label>
-
-        <progress id="encodeProgress" max="100" value="0"></progress>
-
-        <div class="actions">
-          <button id="downloadGsusBtn" disabled>Download file##.gsus</button>
-          <button class="secondary" id="copyGsusBtn" disabled>Copy .gsus text</button>
-        </div>
-
-        <div class="preview" id="encodePreview"><div class="empty">Selected files will show here after processing.</div></div>
-        <div id="encodeStatus" class="status"></div>
-      </article>
-
-      <article class="card">
-        <h2>2. .gsus back to media</h2>
-        <p>Upload a <code>.gsus</code> file made by this tool. It can contain one file or a whole media bundle.</p>
-
-        <label class="drop-zone" id="gsusDrop">
-          <input id="gsusInput" type="file" accept=".gsus,.json,.txt,text/plain,application/json" />
-          <span>
-            <span class="drop-title">Drop a .gsus file here or tap to upload</span><br />
-            <span class="drop-subtitle">The decoded media will preview here and can open in a new tab.</span>
-          </span>
-        </label>
-
-        <div class="actions">
-          <button id="openViewerBtn" disabled>Open viewer in new tab</button>
-          <button class="secondary" id="downloadDecodedBtn" disabled>Download decoded files</button>
-        </div>
-
-        <div class="preview" id="decodePreview"><div class="empty">Decoded media preview will show here.</div></div>
-        <div id="decodeStatus" class="status"></div>
-      </article>
-    </section>
-
-    <p class="note">
-      The <code>.gsus</code> extension is custom. The file is still readable text, but it contains a JSON media bundle with Base64 data URIs inside. Large videos can become very large because Base64 adds roughly one-third more size and may hit browser memory limits.
-    </p>
-  </main>
-
-  <script>
-    const mediaInput = document.getElementById('mediaInput');
-    const gsusInput = document.getElementById('gsusInput');
-    const downloadGsusBtn = document.getElementById('downloadGsusBtn');
-    const copyGsusBtn = document.getElementById('copyGsusBtn');
-    const openViewerBtn = document.getElementById('openViewerBtn');
-    const downloadDecodedBtn = document.getElementById('downloadDecodedBtn');
-    const encodePreview = document.getElementById('encodePreview');
-    const decodePreview = document.getElementById('decodePreview');
-    const encodeStatus = document.getElementById('encodeStatus');
-    const decodeStatus = document.getElementById('decodeStatus');
-    const encodeProgress = document.getElementById('encodeProgress');
-
-    let currentBundle = null;
-    let currentBundleText = '';
-    let decodedBundle = null;
-
-    function setStatus(element, message, type = '') {
-      element.textContent = message;
-      element.className = `status ${type}`.trim();
-    }
-
-    function safeName(name, fallback = 'media') {
-      return (name || fallback).replace(/[\\/:*?"<>|]+/g, '-').replace(/^\.+/, '').trim() || fallback;
-    }
-
-    function formatBytes(bytes) {
-      if (!Number.isFinite(bytes)) return 'Unknown size';
-      const units = ['B', 'KB', 'MB', 'GB'];
-      let size = bytes;
-      let unit = 0;
-      while (size >= 1024 && unit < units.length - 1) {
-        size /= 1024;
-        unit++;
-      }
-      return `${size.toFixed(size >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
-    }
-
-    function extensionFromName(fileName) {
-      return (fileName.match(/\.([a-z0-9]{1,8})$/i) || [])[1]?.toLowerCase() || '';
-    }
-
-    function mimeFromExtension(fileName) {
-      const ext = extensionFromName(fileName);
-      const map = {
-        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', avif: 'image/avif', bmp: 'image/bmp',
-        mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', mkv: 'video/x-matroska',
-        mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg', aac: 'audio/aac'
-      };
-      return map[ext] || '';
-    }
-
-    function getKind(mimeType, fileName = '') {
-      const mime = mimeType || mimeFromExtension(fileName);
-      if (mime.startsWith('image/')) return 'image';
-      if (mime.startsWith('video/')) return 'video';
-      if (mime.startsWith('audio/')) return 'audio';
-      return 'file';
-    }
-
-    function isSupportedFile(file) {
-      return getKind(file.type, file.name) !== 'file';
-    }
-
-    function detectMime(dataUri) {
-      const match = String(dataUri || '').match(/^data:([^;]+);base64,/);
-      return match ? match[1] : '';
-    }
-
-    function isSupportedDataUri(value) {
-      return /^data:(image|video|audio)\/[a-zA-Z0-9.+-]+;base64,/.test(value || '');
-    }
-
-    function readAsDataURL(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
-        reader.readAsDataURL(file);
-      });
-    }
-
-    function downloadText(content, fileName) {
-      const blob = new Blob([content], { type: 'application/vnd.gsus+json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-    }
-
-    function dataUriToBlob(dataUri) {
-      const [header, base64] = dataUri.split(',');
-      const mime = (header.match(/^data:([^;]+);base64$/) || [])[1] || 'application/octet-stream';
-      const binary = atob(base64);
-      const chunks = [];
-      for (let i = 0; i < binary.length; i += 1024 * 512) {
-        const slice = binary.slice(i, i + 1024 * 512);
-        const bytes = new Uint8Array(slice.length);
-        for (let j = 0; j < slice.length; j++) bytes[j] = slice.charCodeAt(j);
-        chunks.push(bytes);
-      }
-      return new Blob(chunks, { type: mime });
-    }
-
-    function downloadDataUri(dataUri, fileName) {
-      const blob = dataUriToBlob(dataUri);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
-
-    function nextGsusFileName() {
-      const key = 'gsusFileCounter';
-      let count = parseInt(localStorage.getItem(key) || '1', 10);
-      if (!Number.isFinite(count) || count < 1) count = 1;
-      localStorage.setItem(key, String(count + 1));
-      return `file${String(count).padStart(2, '0')}.gsus`;
-    }
-
-    function normalizeBundle(input, sourceName = 'decoded.gsus') {
-      if (input && Array.isArray(input.files)) {
-        const files = input.files.map((item, index) => {
-          const dataUri = String(item.dataUri || item.dataURI || item.uri || '').trim();
-          const mimeType = item.mimeType || item.type || detectMime(dataUri) || mimeFromExtension(item.originalName || item.fileName || item.name || '') || 'application/octet-stream';
-          return {
-            id: item.id || `item-${index + 1}`,
-            originalName: safeName(item.originalName || item.fileName || item.name || `media-${index + 1}`),
-            mimeType,
-            sizeBytes: Number(item.sizeBytes || 0),
-            kind: item.kind || getKind(mimeType),
-            dataUri
-          };
-        }).filter(item => isSupportedDataUri(item.dataUri));
-
-        return {
-          gsus: input.gsus || 'GSUS_MEDIA_BASE64_URI_BUNDLE',
-          version: input.version || 2,
-          type: input.type || 'media-bundle',
-          createdAt: input.createdAt || new Date().toISOString(),
-          files
-        };
-      }
-
-      const directUri = input && (input.dataUri || input.dataURI || input.uri || input.url);
-      if (typeof directUri === 'string') {
-        const mimeType = input.mimeType || input.type || detectMime(directUri);
-        return {
-          gsus: 'GSUS_MEDIA_BASE64_URI_BUNDLE',
-          version: 2,
-          type: 'media-bundle',
-          createdAt: new Date().toISOString(),
-          files: [{
-            id: 'item-1',
-            originalName: safeName(input.originalName || input.fileName || input.name || sourceName),
-            mimeType,
-            sizeBytes: Number(input.sizeBytes || 0),
-            kind: getKind(mimeType),
-            dataUri: directUri.trim()
-          }].filter(item => isSupportedDataUri(item.dataUri))
-        };
-      }
-
-      return null;
-    }
-
-    function parseGsusText(text, sourceName = 'decoded.gsus') {
-      const trimmed = text.trim();
-      if (!trimmed) throw new Error('That file is empty.');
-
-      try {
-        const parsed = JSON.parse(trimmed);
-        const bundle = normalizeBundle(parsed, sourceName);
-        if (bundle && bundle.files.length) return bundle;
-      } catch (_) {}
-
-      const matches = trimmed.match(/data:(image|video|audio)\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+/=\r\n]+/g) || [];
-      const files = matches.map((raw, index) => {
-        const dataUri = raw.replace(/\s+/g, '');
-        const mimeType = detectMime(dataUri);
-        return {
-          id: `item-${index + 1}`,
-          originalName: `media-${index + 1}`,
-          mimeType,
-          sizeBytes: 0,
-          kind: getKind(mimeType),
-          dataUri
-        };
-      }).filter(item => isSupportedDataUri(item.dataUri));
-
-      if (!files.length) throw new Error('No supported media Base64 data URI found. It needs image, video, or audio data.');
-
-      return {
-        gsus: 'GSUS_MEDIA_BASE64_URI_BUNDLE',
-        version: 2,
-        type: 'media-bundle',
-        createdAt: new Date().toISOString(),
-        files
-      };
-    }
-
-    function extensionFromMime(mimeType, originalName = '') {
-      const existing = extensionFromName(originalName);
-      if (existing) return existing;
-      const map = {
-        'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/avif': 'avif', 'image/bmp': 'bmp',
-        'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'video/x-matroska': 'mkv',
-        'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/aac': 'aac'
-      };
-      return map[mimeType] || (mimeType && mimeType.includes('/') ? mimeType.split('/')[1].replace('+xml', '') : 'bin');
-    }
-
-    function mediaElement(item, compact = false) {
-      let element;
-      if (item.kind === 'image') {
-        element = document.createElement('img');
-        element.alt = item.originalName;
-      } else if (item.kind === 'video') {
-        element = document.createElement('video');
-        element.controls = true;
-        element.muted = compact;
-        element.playsInline = true;
-      } else if (item.kind === 'audio') {
-        element = document.createElement('audio');
-        element.controls = true;
-      } else {
-        element = document.createElement('span');
-        element.textContent = 'File';
-        return element;
-      }
-      element.src = item.dataUri;
-      return element;
-    }
-
-    function renderPreview(bundle, target) {
-      target.innerHTML = '';
-      const grid = document.createElement('div');
-      grid.className = 'preview-grid';
-
-      bundle.files.forEach((item, index) => {
-        const card = document.createElement('div');
-        card.className = 'media-card';
-
-        const thumb = document.createElement('div');
-        thumb.className = 'thumb';
-        thumb.appendChild(mediaElement(item, true));
-
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-
-        const title = document.createElement('strong');
-        title.textContent = item.originalName;
-
-        const detail = document.createElement('span');
-        detail.textContent = `${item.mimeType}${item.sizeBytes ? ' · ' + formatBytes(item.sizeBytes) : ''}`;
-
-        const mini = document.createElement('div');
-        mini.className = 'mini-actions';
-
-        const openBtn = document.createElement('button');
-        openBtn.className = 'secondary';
-        openBtn.textContent = 'Open';
-        openBtn.addEventListener('click', () => openViewer({ ...bundle, files: [item] }));
-
-        const downloadBtn = document.createElement('button');
-        downloadBtn.className = 'secondary';
-        downloadBtn.textContent = 'Download';
-        downloadBtn.addEventListener('click', () => downloadDecodedItem(item, index));
-
-        mini.append(openBtn, downloadBtn);
-        meta.append(title, detail, mini);
-        card.append(thumb, meta);
-        grid.appendChild(card);
-      });
-
-      target.appendChild(grid);
-    }
-
-    async function handleMediaFiles(fileList) {
-      const files = Array.from(fileList || []);
-      if (!files.length) return;
-
-      const supported = files.filter(isSupportedFile);
-      if (!supported.length) {
-        setStatus(encodeStatus, 'Choose at least one image, video, or audio file.', 'bad');
-        return;
-      }
-
-      currentBundle = null;
-      currentBundleText = '';
-      downloadGsusBtn.disabled = true;
-      copyGsusBtn.disabled = true;
-      encodeProgress.classList.add('show');
-      encodeProgress.value = 0;
-      setStatus(encodeStatus, `Encoding ${supported.length} file${supported.length === 1 ? '' : 's'}...`);
-
-      try {
-        const encodedFiles = [];
-        for (let i = 0; i < supported.length; i++) {
-          const file = supported[i];
-          const mimeType = file.type || mimeFromExtension(file.name) || 'application/octet-stream';
-          setStatus(encodeStatus, `Encoding ${i + 1}/${supported.length}: ${file.name}`);
-          encodedFiles.push({
-            id: `item-${i + 1}`,
-            originalName: safeName(file.name, `media-${i + 1}`),
-            mimeType,
-            sizeBytes: file.size,
-            kind: getKind(mimeType, file.name),
-            dataUri: await readAsDataURL(file)
-          });
-          encodeProgress.value = Math.round(((i + 1) / supported.length) * 100);
-        }
-
-        currentBundle = {
-          gsus: 'GSUS_MEDIA_BASE64_URI_BUNDLE',
-          version: 2,
-          type: 'media-bundle',
-          createdAt: new Date().toISOString(),
-          totalFiles: encodedFiles.length,
-          files: encodedFiles
-        };
-        currentBundleText = JSON.stringify(currentBundle, null, 2);
-
-        renderPreview(currentBundle, encodePreview);
-        downloadGsusBtn.disabled = false;
-        copyGsusBtn.disabled = false;
-        const originalSize = supported.reduce((sum, file) => sum + file.size, 0);
-        const outputSize = new Blob([currentBundleText]).size;
-        setStatus(encodeStatus, `Ready. ${encodedFiles.length} file${encodedFiles.length === 1 ? '' : 's'} encoded into one .gsus bundle. Original: ${formatBytes(originalSize)}. GSUS: ${formatBytes(outputSize)}.`, 'good');
-      } catch (error) {
-        setStatus(encodeStatus, error.message || 'Could not encode those files.', 'bad');
-      } finally {
-        encodeProgress.classList.remove('show');
-      }
-    }
-
-    mediaInput.addEventListener('change', () => handleMediaFiles(mediaInput.files));
-
-    downloadGsusBtn.addEventListener('click', () => {
-      if (!currentBundleText) return;
-      downloadText(currentBundleText, nextGsusFileName());
-    });
-
-    copyGsusBtn.addEventListener('click', async () => {
-      if (!currentBundleText) return;
-      try {
-        await navigator.clipboard.writeText(currentBundleText);
-        setStatus(encodeStatus, 'Copied .gsus bundle text to clipboard.', 'good');
-      } catch (_) {
-        setStatus(encodeStatus, 'Copy failed, probably because the bundle is too large. Download the .gsus file instead.', 'bad');
-      }
-    });
-
-    gsusInput.addEventListener('change', () => {
-      const file = gsusInput.files && gsusInput.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          decodedBundle = parseGsusText(String(reader.result || ''), file.name);
-          if (!decodedBundle.files.length) throw new Error('No readable media files were found inside that .gsus file.');
-          renderPreview(decodedBundle, decodePreview);
-          openViewerBtn.disabled = false;
-          downloadDecodedBtn.disabled = false;
-          setStatus(decodeStatus, `Decoded ${decodedBundle.files.length} file${decodedBundle.files.length === 1 ? '' : 's'} successfully.`, 'good');
-        } catch (error) {
-          decodedBundle = null;
-          openViewerBtn.disabled = true;
-          downloadDecodedBtn.disabled = true;
-          decodePreview.innerHTML = '<div class="empty">Decoded media preview will show here.</div>';
-          setStatus(decodeStatus, error.message || 'Could not decode that .gsus file.', 'bad');
-        }
-      };
-      reader.onerror = () => setStatus(decodeStatus, 'Could not read that .gsus file.', 'bad');
-      reader.readAsText(file);
-    });
-
-    openViewerBtn.addEventListener('click', () => decodedBundle && openViewer(decodedBundle));
-
-    downloadDecodedBtn.addEventListener('click', () => {
-      if (!decodedBundle) return;
-      decodedBundle.files.forEach((item, index) => {
-        setTimeout(() => downloadDecodedItem(item, index), index * 350);
-      });
-    });
-
-    function downloadDecodedItem(item, index = 0) {
-      const clean = safeName(item.originalName || `media-${index + 1}`);
-      const hasExt = /\.[a-z0-9]{1,8}$/i.test(clean);
-      const fileName = hasExt ? clean : `${clean}.${extensionFromMime(item.mimeType, clean)}`;
-      downloadDataUri(item.dataUri, fileName);
-    }
-
-    function openViewer(bundle) {
-      const tab = window.open('', '_blank');
-      if (!tab) {
-        setStatus(decodeStatus, 'Popup blocked. Allow popups for this page, then try again.', 'bad');
-        return;
-      }
-
-      const isSingle = bundle.files.length === 1;
-      const bodyClass = isSingle ? 'single' : 'multi';
-      const itemsHtml = bundle.files.map(item => {
-        const safeTitle = safeName(item.originalName, 'media').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        const src = item.dataUri;
-        let media = '<p>Unsupported media</p>';
-        if (item.kind === 'image') media = `<img src="${src}" alt="${safeTitle}">`;
-        if (item.kind === 'video') media = `<video src="${src}" controls playsinline></video>`;
-        if (item.kind === 'audio') media = `<audio src="${src}" controls></audio>`;
-        return isSingle ? media : `<section class="item">${media}<div class="name">${safeTitle}</div></section>`;
-      }).join('');
-
-      const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GSUS Viewer</title>
-  <style>
-    * { box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; background: #000; color: #fff; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body.single { width: 100vw; height: 100vh; display: grid; place-items: center; overflow: hidden; }
-    body.single img, body.single video { max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain; }
-    body.single audio { width: min(760px, 92vw); }
-    body.multi { min-height: 100vh; padding: 18px; display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-content: start; overflow-x: hidden; }
-    .item { display: grid; gap: 10px; padding: 12px; border: 1px solid rgba(255,255,255,.18); border-radius: 16px; background: rgba(255,255,255,.07); }
-    .item img, .item video { width: 100%; max-height: 72vh; object-fit: contain; background: #000; border-radius: 10px; }
-    .item audio { width: 100%; }
-    .name { color: rgba(255,255,255,.78); font-size: 14px; overflow-wrap: anywhere; }
-  </style>
-</head>
-<body class="${bodyClass}">
-  ${itemsHtml}
-</body>
-</html>`;
-
-      tab.document.open();
-      tab.document.write(html);
-      tab.document.close();
-      setStatus(decodeStatus, 'Opened GSUS viewer in a new tab.', 'good');
-    }
-
-    for (const dropZone of [document.getElementById('mediaDrop'), document.getElementById('gsusDrop')]) {
-      ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, event => {
-          event.preventDefault();
-          dropZone.classList.add('dragover');
-        });
-      });
-
-      ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, event => {
-          event.preventDefault();
-          dropZone.classList.remove('dragover');
-        });
-      });
-
-      dropZone.addEventListener('drop', event => {
-        event.preventDefault();
-        const files = event.dataTransfer.files;
-        if (!files.length) return;
-        if (dropZone.id === 'mediaDrop') handleMediaFiles(files);
-        if (dropZone.id === 'gsusDrop') {
-          const input = document.getElementById('gsusInput');
-          try {
-            input.files = files;
-            input.dispatchEvent(new Event('change'));
-          } catch (_) {
-            const reader = new FileReader();
-            reader.onload = () => {
-              try {
-                decodedBundle = parseGsusText(String(reader.result || ''), files[0].name);
-                renderPreview(decodedBundle, decodePreview);
-                openViewerBtn.disabled = false;
-                downloadDecodedBtn.disabled = false;
-                setStatus(decodeStatus, `Decoded ${decodedBundle.files.length} file${decodedBundle.files.length === 1 ? '' : 's'} successfully.`, 'good');
-              } catch (error) {
-                setStatus(decodeStatus, error.message || 'Could not decode that .gsus file.', 'bad');
-              }
-            };
-            reader.readAsText(files[0]);
-          }
-        }
-      });
-    }
-  </script>
+<main>
+  <section class="hero">
+    <h1>GSUS Media ⇄ Base64</h1>
+    <p class="sub">Upload one or more images, videos, or audio files and download them as one custom <code>.gsus</code> Base64 bundle. Then upload that <code>.gsus</code> file later to rebuild and view the media.</p>
+  </section>
+
+  <section class="grid">
+    <article class="card">
+      <h2>1. Media to .gsus</h2>
+      <p>Choose images, videos, or audio files. Multiple files become one large <code>.gsus</code> file.</p>
+      <label class="drop" id="mediaDrop">
+        <input id="mediaInput" type="file" accept="image/*,video/*,audio/*,.jpg,.jpeg,.png,.gif,.webp,.svg,.avif,.mp4,.mov,.webm,.m4v,.mp3,.m4a,.wav,.ogg" multiple />
+        <span><span class="title">Drop media here or tap to upload</span><span class="small">Images, videos, and audio. Nothing uploads to a server.</span></span>
+      </label>
+      <progress id="progress" max="100" value="0"></progress>
+      <div class="actions">
+        <button id="downloadGsus" disabled>Download file##.gsus</button>
+        <button class="secondary" id="copyGsus" disabled>Copy .gsus text</button>
+      </div>
+      <div class="preview" id="encodePreview"><div class="empty">Selected files will show here after processing.</div></div>
+      <div class="status" id="encodeStatus"></div>
+    </article>
+
+    <article class="card">
+      <h2>2. .gsus back to media</h2>
+      <p>Upload a <code>.gsus</code> file made by this tool. The iPhone picker is intentionally not restricted so custom <code>.gsus</code> files are selectable.</p>
+      <label class="drop" id="gsusDrop">
+        <input id="gsusInput" type="file" />
+        <span><span class="title">Drop a .gsus file here or tap to upload</span><span class="small">This accepts any file so iOS will not gray out .gsus.</span></span>
+      </label>
+      <div class="actions">
+        <button id="openViewer" disabled>Open viewer in new tab</button>
+        <button class="secondary" id="downloadDecoded" disabled>Download decoded files</button>
+      </div>
+      <div class="preview" id="decodePreview"><div class="empty">Decoded media preview will show here.</div></div>
+      <div class="status" id="decodeStatus"></div>
+    </article>
+  </section>
+
+  <p class="note">Blunt limitation: Base64 makes files about one-third larger. Big videos can choke mobile Safari or fail from memory limits.</p>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const mediaInput = $('mediaInput'), gsusInput = $('gsusInput');
+  const downloadGsus = $('downloadGsus'), copyGsus = $('copyGsus'), openViewerBtn = $('openViewer'), downloadDecoded = $('downloadDecoded');
+  const encodePreview = $('encodePreview'), decodePreview = $('decodePreview'), encodeStatus = $('encodeStatus'), decodeStatus = $('decodeStatus'), progress = $('progress');
+  let bundle = null, bundleText = '', decoded = null;
+
+  function status(el,msg,type=''){el.textContent=msg;el.className='status '+type}
+  function safe(name='media'){return String(name).replace(/[\\/:*?"<>|]+/g,'-').replace(/^\.+/,'').trim()||'media'}
+  function bytes(n){if(!Number.isFinite(n))return'Unknown size';let u=['B','KB','MB','GB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return `${n.toFixed(n>=10||i===0?0:1)} ${u[i]}`}
+  function ext(name){return (String(name).match(/\.([a-z0-9]{1,8})$/i)||[])[1]?.toLowerCase()||''}
+  function mimeFromName(name){return {jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',svg:'image/svg+xml',avif:'image/avif',bmp:'image/bmp',mp4:'video/mp4',m4v:'video/mp4',mov:'video/quicktime',webm:'video/webm',mp3:'audio/mpeg',m4a:'audio/mp4',wav:'audio/wav',ogg:'audio/ogg',aac:'audio/aac'}[ext(name)]||''}
+  function kind(mime,name=''){mime=mime||mimeFromName(name);return mime.startsWith('image/')?'image':mime.startsWith('video/')?'video':mime.startsWith('audio/')?'audio':'file'}
+  function detect(dataUri){return (String(dataUri).match(/^data:([^;]+);base64,/)||[])[1]||''}
+  function validUri(v){return /^data:(image|video|audio)\/[a-zA-Z0-9.+-]+;base64,/.test(v||'')}
+  function readURL(file){return new Promise((res,rej)=>{let r=new FileReader();r.onload=()=>res(String(r.result||''));r.onerror=()=>rej(new Error('Could not read '+file.name));r.readAsDataURL(file)})}
+  function nextName(){let k='gsusFileCounter',n=parseInt(localStorage.getItem(k)||'1',10);if(!Number.isFinite(n)||n<1)n=1;localStorage.setItem(k,String(n+1));return `file${String(n).padStart(2,'0')}.gsus`}
+  function saveText(text,name){let url=URL.createObjectURL(new Blob([text],{type:'application/vnd.gsus+json;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+  function dataUriBlob(uri){let [head,b64]=uri.split(','),mime=(head.match(/^data:([^;]+);base64$/)||[])[1]||'application/octet-stream',bin=atob(b64),parts=[];for(let i=0;i<bin.length;i+=524288){let s=bin.slice(i,i+524288),arr=new Uint8Array(s.length);for(let j=0;j<s.length;j++)arr[j]=s.charCodeAt(j);parts.push(arr)}return new Blob(parts,{type:mime})}
+  function saveDataUri(uri,name){let url=URL.createObjectURL(dataUriBlob(uri)),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+  function fileExt(mime,name=''){return ext(name)||{'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','image/svg+xml':'svg','image/avif':'avif','video/mp4':'mp4','video/webm':'webm','video/quicktime':'mov','audio/mpeg':'mp3','audio/mp4':'m4a','audio/wav':'wav','audio/ogg':'ogg'}[mime]||'bin'}
+
+  function mediaEl(item,small=false){let e;if(item.kind==='image'){e=document.createElement('img');e.alt=item.name}else if(item.kind==='video'){e=document.createElement('video');e.controls=true;e.playsInline=true;e.muted=small}else if(item.kind==='audio'){e=document.createElement('audio');e.controls=true}else{e=document.createElement('span');e.textContent='File';return e}e.src=item.dataUri;return e}
+  function render(target,items){target.innerHTML='';let list=document.createElement('div');list.className='list';items.forEach((item,i)=>{let card=document.createElement('div');card.className='item';let th=document.createElement('div');th.className='thumb';th.appendChild(mediaEl(item,true));let meta=document.createElement('div');meta.className='meta';let title=document.createElement('strong');title.textContent=item.name;let detail=document.createElement('span');detail.textContent=`${item.mime}${item.size?' · '+bytes(item.size):''}`;let mini=document.createElement('div');mini.className='mini';let o=document.createElement('button');o.className='secondary';o.textContent='Open';o.onclick=()=>openViewer([item]);let d=document.createElement('button');d.className='secondary';d.textContent='Download';d.onclick=()=>downloadItem(item,i);mini.append(o,d);meta.append(title,detail,mini);card.append(th,meta);list.appendChild(card)});target.appendChild(list)}
+
+  async function encode(filesLike){let files=[...filesLike].filter(f=>kind(f.type,f.name)!=='file');if(!files.length){status(encodeStatus,'Choose at least one image, video, or audio file.','bad');return}bundle=null;bundleText='';downloadGsus.disabled=copyGsus.disabled=true;progress.classList.add('show');progress.value=0;status(encodeStatus,`Encoding ${files.length} file${files.length===1?'':'s'}...`);try{let out=[];for(let i=0;i<files.length;i++){let f=files[i],mime=f.type||mimeFromName(f.name)||'application/octet-stream';status(encodeStatus,`Encoding ${i+1}/${files.length}: ${f.name}`);out.push({id:`item-${i+1}`,name:safe(f.name),mime,size:f.size,kind:kind(mime,f.name),dataUri:await readURL(f)});progress.value=Math.round(((i+1)/files.length)*100)}bundle={gsus:'GSUS_MEDIA_BASE64_URI_BUNDLE',version:3,type:'media-bundle',createdAt:new Date().toISOString(),files:out};bundleText=JSON.stringify(bundle,null,2);render(encodePreview,out);downloadGsus.disabled=copyGsus.disabled=false;status(encodeStatus,`Ready. ${out.length} file${out.length===1?'':'s'} encoded. GSUS size: ${bytes(new Blob([bundleText]).size)}.`,'good')}catch(e){status(encodeStatus,e.message||'Could not encode files.','bad')}finally{progress.classList.remove('show')}}
+
+  function parse(text,source='decoded.gsus'){let t=text.trim();if(!t)throw new Error('That file is empty.');try{let j=JSON.parse(t),arr=Array.isArray(j.files)?j.files:[j];let files=arr.map((x,i)=>{let uri=String(x.dataUri||x.dataURI||x.uri||x.url||'').trim(),mime=x.mime||x.mimeType||x.type||detect(uri)||mimeFromName(x.name||x.fileName||x.originalName||'');return {id:x.id||`item-${i+1}`,name:safe(x.name||x.fileName||x.originalName||source),mime,size:Number(x.size||x.sizeBytes||0),kind:x.kind||kind(mime),dataUri:uri}}).filter(x=>validUri(x.dataUri));if(files.length)return{files}}catch(e){}let hits=t.match(/data:(image|video|audio)\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+/=\r\n]+/g)||[],files=hits.map((raw,i)=>{let uri=raw.replace(/\s+/g,''),mime=detect(uri);return{id:`item-${i+1}`,name:`media-${i+1}`,mime,size:0,kind:kind(mime),dataUri:uri}});if(!files.length)throw new Error('No supported image, video, or audio Base64 data URI found.');return{files}}
+  function decodeFile(file){let r=new FileReader();r.onload=()=>{try{decoded=parse(String(r.result||''),file.name);render(decodePreview,decoded.files);openViewerBtn.disabled=downloadDecoded.disabled=false;status(decodeStatus,`Decoded ${decoded.files.length} file${decoded.files.length===1?'':'s'} successfully.`,'good')}catch(e){decoded=null;openViewerBtn.disabled=downloadDecoded.disabled=true;decodePreview.innerHTML='<div class="empty">Decoded media preview will show here.</div>';status(decodeStatus,e.message||'Could not decode file.','bad')}};r.onerror=()=>status(decodeStatus,'Could not read that file.','bad');r.readAsText(file)}
+  function downloadItem(item,i=0){let name=safe(item.name||`media-${i+1}`),final=/\.[a-z0-9]{1,8}$/i.test(name)?name:`${name}.${fileExt(item.mime,name)}`;saveDataUri(item.dataUri,final)}
+  function openViewer(items){let w=window.open('','_blank');if(!w){status(decodeStatus,'Popup blocked. Allow popups and try again.','bad');return}let single=items.length===1,bodyClass=single?'single':'multi',htmlItems=items.map(item=>{let name=safe(item.name).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'),src=item.dataUri,media='<p>Unsupported media</p>';if(item.kind==='image')media=`<img src="${src}" alt="${name}">`;if(item.kind==='video')media=`<video src="${src}" controls playsinline></video>`;if(item.kind==='audio')media=`<audio src="${src}" controls></audio>`;return single?media:`<section class="item">${media}<div class="name">${name}</div></section>`}).join('');w.document.open();w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GSUS Viewer</title><style>*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#000;color:#fff;font-family:system-ui}body.single{width:100vw;height:100vh;display:grid;place-items:center;overflow:hidden}body.single img,body.single video{max-width:100vw;max-height:100vh;width:auto;height:auto;object-fit:contain}body.single audio{width:min(760px,92vw)}body.multi{min-height:100vh;padding:18px;display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));align-content:start}.item{display:grid;gap:10px;padding:12px;border:1px solid rgba(255,255,255,.18);border-radius:16px;background:rgba(255,255,255,.07)}.item img,.item video{width:100%;max-height:72vh;object-fit:contain;background:#000;border-radius:10px}.item audio{width:100%}.name{color:rgba(255,255,255,.78);font-size:14px;overflow-wrap:anywhere}</style></head><body class="${bodyClass}">${htmlItems}</body></html>`);w.document.close();status(decodeStatus,'Opened GSUS viewer in a new tab.','good')}
+
+  mediaInput.addEventListener('change',()=>encode(mediaInput.files));
+  gsusInput.addEventListener('change',()=>{let f=gsusInput.files&&gsusInput.files[0];if(f)decodeFile(f)});
+  downloadGsus.onclick=()=>bundleText&&saveText(bundleText,nextName());
+  copyGsus.onclick=async()=>{try{await navigator.clipboard.writeText(bundleText);status(encodeStatus,'Copied .gsus text.','good')}catch(e){status(encodeStatus,'Copy failed, probably because the .gsus is too large. Download it instead.','bad')}};
+  openViewerBtn.onclick=()=>decoded&&openViewer(decoded.files);
+  downloadDecoded.onclick=()=>decoded&&decoded.files.forEach((x,i)=>setTimeout(()=>downloadItem(x,i),i*350));
+
+  for(const zone of [$('mediaDrop'),$('gsusDrop')]){
+    ['dragenter','dragover'].forEach(ev=>zone.addEventListener(ev,e=>{e.preventDefault();zone.classList.add('drag')}));
+    ['dragleave','drop'].forEach(ev=>zone.addEventListener(ev,e=>{e.preventDefault();zone.classList.remove('drag')}));
+    zone.addEventListener('drop',e=>{let files=e.dataTransfer.files;if(!files.length)return;if(zone.id==='mediaDrop')encode(files);else decodeFile(files[0])});
+  }
+</script>
 </body>
 </html>
